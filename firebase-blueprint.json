@@ -1,0 +1,42 @@
+{
+  "entities": {
+    "KidProfile": {
+      "title": "Kid Profile",
+      "description": "A profile for a kid using the platform.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "age": { "type": "number" },
+        "avatar": { "type": "string" },
+        "stars": { "type": "number" },
+        "lastPlayed": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "age", "avatar", "stars"]
+    },
+    "ActivityLog": {
+      "title": "Activity Log",
+      "description": "A log of an activity performed by a kid.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "kidId": { "type": "string" },
+        "activityType": { "type": "string", "enum": ["tracing", "spelling", "story"] },
+        "content": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "starsEarned": { "type": "number" }
+      },
+      "required": ["id", "kidId", "activityType", "timestamp", "starsEarned"]
+    }
+  },
+  "firestore": {
+    "/kids/{kidId}": {
+      "schema": "KidProfile",
+      "description": "Collection of kid profiles."
+    },
+    "/activities": {
+      "schema": "ActivityLog",
+      "description": "Global log of all activities."
+    }
+  }
+}

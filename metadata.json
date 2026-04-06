@@ -1,0 +1,5 @@
+{
+  "name": "BrightKids Learning Hub",
+  "description": "An engaging daily learning platform for kids aged 4-6, focusing on English writing basics with parent monitoring features.",
+  "requestFramePermissions": ["microphone"]
+}

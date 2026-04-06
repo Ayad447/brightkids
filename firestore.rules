@@ -1,0 +1,88 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: kids
+    // Document ID: {kidId}
+    // Fields:
+    //   - id: string (required)
+    //   - name: string (required, 1-50 chars)
+    //   - age: number (required, 3-12)
+    //   - avatar: string (required)
+    //   - stars: number (required, positive)
+    //   - lastPlayed: string (optional, ISO8601)
+    //
+    // Collection: activities
+    // Document ID: auto-generated
+    // Fields:
+    //   - id: string (required)
+    //   - kidId: string (required)
+    //   - activityType: string (required, enum: tracing, spelling, story)
+    //   - content: string (optional)
+    //   - timestamp: string (required, ISO8601)
+    //   - starsEarned: number (required, positive)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (request.auth.token.email == "syeda@vfairs.com" && request.auth.token.email_verified == true);
+    }
+
+    function isValidDateString(dateStr) {
+      return dateStr is string &&
+        dateStr.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidKid(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() <= 50 &&
+             data.age is number && data.age >= 3 && data.age <= 12 &&
+             data.avatar is string && data.avatar.size() > 0 &&
+             data.stars is number && data.stars >= 0;
+    }
+
+    function isValidActivity(data) {
+      return data.kidId is string && data.kidId.size() > 0 &&
+             data.activityType in ['tracing', 'spelling', 'story'] &&
+             isValidDateString(data.timestamp) &&
+             data.starsEarned is number && data.starsEarned >= 0;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /kids/{kidId} {
+      // For this specific kid app, we allow reading profiles if authenticated
+      // In a real multi-tenant app, we'd scope this to families.
+      allow read: if isAuthenticated();
+      allow create, update: if isAdmin() && isValidKid(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /activities/{activityId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidActivity(request.resource.data);
+      allow update, delete: if isAdmin();
+    }
+  }
+}
