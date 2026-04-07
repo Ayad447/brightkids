@@ -58,7 +58,8 @@ export default function SkyRescueGame({ kid, onComplete }: Props) {
     score: 0,
     lives: 3,
     isHit: false,
-    powerUps: { shield: 0, slow: 0, magnet: 0 }
+    powerUps: { shield: 0, slow: 0, magnet: 0 },
+    collectedItems: new Set<number>() // Added to track collections & prevent double-firing
   });
 
   // Load High Score on Mount
@@ -74,30 +75,45 @@ export default function SkyRescueGame({ kid, onComplete }: Props) {
   // Sync state to refs
   useEffect(() => { stateRef.current.currentLane = currentLane; }, [currentLane]);
 
-  // Theme Engine
+  // Theme Engine (Now with more themes and an endless loop!)
   const getTheme = (pts: number) => {
-    if (pts < 200) return { bg: 'from-blue-400 to-cyan-300', obs: ['⛈️'], phase: 'Day' };
-    if (pts < 400) return { bg: 'from-orange-400 to-pink-400', obs: ['🦅', '⛈️'], phase: 'Sunset' };
-    return { bg: 'from-indigo-900 to-black', obs: ['☄️', '🛸'], phase: 'Space' };
+    const THEMES = [
+      { bg: 'from-blue-400 to-cyan-300', obs: ['⛈️'], phase: 'Day' },
+      { bg: 'from-orange-400 to-pink-400', obs: ['🦅', '⛈️'], phase: 'Sunset' },
+      { bg: 'from-indigo-800 to-purple-900', obs: ['🦇', '☁️'], phase: 'Night' },
+      { bg: 'from-indigo-950 to-black', obs: ['☄️', '🛸'], phase: 'Space' },
+      { bg: 'from-fuchsia-900 to-violet-950', obs: ['👾', '🪐'], phase: 'Nebula' },
+      { bg: 'from-rose-900 to-red-950', obs: ['☄️', '🛰️'], phase: 'Galaxy' }
+    ];
+
+    // Each phase lasts for 200 points. The modulo (%) loops it back to 0!
+    const phaseIndex = Math.floor(pts / 200) % THEMES.length;
+    return THEMES[phaseIndex];
   };
+
   const theme = getTheme(displayScore);
 
   const spawnEntities = () => {
-    const currentScore = Math.floor(stateRef.current.score / 10);
-    const difficultyMultiplier = 1 + Math.floor(currentScore / 150) * 0.2;
-    const currentTheme = getTheme(currentScore);
+    const currentScore = stateRef.current.score;
+    // Slowly scale up to 2.0x difficulty at 20,000 internal points (which is 2,000 display points)
+    const difficultyMultiplier = 1 + (currentScore / 20000);
+    const currentTheme = getTheme(Math.floor(currentScore / 10));
 
     // Spawn Obstacles
     const allLanes = [0, 1, 2];
-    const numBlocked = Math.random() > 0.6 ? 2 : 1;
+    // Only spawn double obstacles 20% of the time early on, increasing with score
+    const doubleChance = Math.min(0.6, 0.2 + (currentScore / 10000));
+    const numBlocked = Math.random() < doubleChance ? 2 : 1;
+
     const blockedLanes = allLanes.sort(() => 0.5 - Math.random()).slice(0, numBlocked);
-    const safeLane = allLanes.find(l => !blockedLanes.includes(l)) || 1;
+    const safeLane = allLanes.find(l => !blockedLanes.includes(l)) ?? 1;
 
     const newObstacle: WallObstacle = {
       id: Date.now(),
       y: -15,
       blockedLanes,
-      speed: (Math.random() * 0.4 + 0.6) * difficultyMultiplier,
+      // Lowered base speed from 0.6 to 0.4 for a gentler start
+      speed: (Math.random() * 0.3 + 0.4) * difficultyMultiplier,
       emoji: currentTheme.obs[Math.floor(Math.random() * currentTheme.obs.length)],
     };
 
@@ -143,11 +159,16 @@ export default function SkyRescueGame({ kid, onComplete }: Props) {
     }
 
     const slowMultiplier = powerUps.slow > 0 ? 0.5 : 1;
-    const diffMultiplier = 1 + Math.floor((stateRef.current.score / 10) / 150) * 0.2;
+
+    const currentScore = stateRef.current.score;
+    // Difficulty multiplier used for timing
+    const diffMultiplier = 1 + (currentScore / 20000);
 
     // Spawn Logic
-    const baseSpawnRate = 90;
-    const adjustedSpawnRate = Math.max(40, Math.floor((baseSpawnRate / diffMultiplier) / slowMultiplier));
+    // Start with a very slow spawn (120 frames), narrowing down to 50 frames at high scores
+    const baseSpawnRate = 120;
+    const adjustedSpawnRate = Math.max(50, Math.floor((baseSpawnRate / diffMultiplier) / slowMultiplier));
+
     if (frameCount.current % adjustedSpawnRate === 0) {
       spawnEntities();
     }
@@ -192,7 +213,13 @@ export default function SkyRescueGame({ kid, onComplete }: Props) {
   };
 
   const handleHit = () => {
-    // FIX: Using optional chaining in case playWrong doesn't exist in your sound-utils
+    // FIX: Block React StrictMode from double-firing this function
+    if (stateRef.current.isHit) return;
+
+    // Immediately flag as hit to prevent the second invocation
+    stateRef.current.isHit = true;
+    setIsHit(true);
+
     soundManager.playWrong?.() || soundManager.playGameOver();
 
     stateRef.current.lives -= 1;
@@ -214,13 +241,10 @@ export default function SkyRescueGame({ kid, onComplete }: Props) {
         confetti({ particleCount: 200, spread: 100, origin: { y: 0.5 }, zIndex: 100 });
       }
 
-      // Removed the immediate onComplete(10) here so the user can see the Game Over screen
       return;
     }
 
     // Invincibility frames
-    stateRef.current.isHit = true;
-    setIsHit(true);
     setTimeout(() => {
       stateRef.current.isHit = false;
       setIsHit(false);
@@ -228,6 +252,10 @@ export default function SkyRescueGame({ kid, onComplete }: Props) {
   };
 
   const handleItemCollect = (item: Collectible) => {
+    // FIX: Prevent double-collecting in StrictMode
+    if (stateRef.current.collectedItems.has(item.id)) return;
+    stateRef.current.collectedItems.add(item.id);
+
     soundManager.playPop();
     if (item.type === 'star') {
       stateRef.current.score += 500; // +50 points
@@ -264,7 +292,8 @@ export default function SkyRescueGame({ kid, onComplete }: Props) {
       score: 0,
       lives: 3,
       isHit: false,
-      powerUps: { shield: 0, slow: 0, magnet: 0 }
+      powerUps: { shield: 0, slow: 0, magnet: 0 },
+      collectedItems: new Set<number>() // Reset collected items
     };
     frameCount.current = 0;
 
@@ -273,7 +302,6 @@ export default function SkyRescueGame({ kid, onComplete }: Props) {
   };
 
   const handleExit = () => {
-    // Let the parent know they finished if they survived long enough
     if (highScore > 50) {
       onComplete(10);
     }
@@ -344,7 +372,8 @@ export default function SkyRescueGame({ kid, onComplete }: Props) {
           )}
 
           <div className={`text-4xl sm:text-6xl -rotate-45 drop-shadow-xl transition-opacity ${isHit ? 'opacity-50' : 'opacity-100'}`}>
-            {theme.phase === 'Space' ? '🚀' : '✈️'}
+            {/* Turn into a rocket ship for the deep space phases! */}
+            {['Space', 'Nebula', 'Galaxy'].includes(theme.phase) ? '🚀' : '✈️'}
           </div>
 
           <div className="absolute bottom-[-10px] left-1/2 -translate-x-1/2 text-sm animate-ping text-white/50">💨</div>
