@@ -42,11 +42,10 @@ export default function BubbleCatchGame({ kid, onComplete }: Props) {
     const newBubble: Bubble = {
       id: Date.now() + Math.random(),
       letter,
-      x: Math.random() * 75 + 10,
-      y: 110,
-      speed: Math.random() * 0.2 + 0.1,
-      // Smaller bubbles on mobile
-      size: Math.random() * 15 + 50,
+      x: Math.random() * 80 + 10, // Adjusted to stay away from extreme edges
+      y: 105, // Start just slightly below the visible frame
+      speed: Math.random() * 0.3 + 0.2, // Slightly faster for mobile engagement
+      size: Math.random() * 20 + 60, // Slightly larger for easier touch targets
     };
     setBubbles(prev => [...prev, newBubble]);
     bubblesCountRef.current++;
@@ -116,7 +115,7 @@ export default function BubbleCatchGame({ kid, onComplete }: Props) {
   };
 
   return (
-    <div className="flex flex-col h-full space-y-3 sm:space-y-4 text-center">
+    <div className="flex flex-col h-[100dvh] max-h-screen p-4 space-y-3 sm:space-y-4 text-center overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between flex-shrink-0">
         <Link
@@ -133,8 +132,8 @@ export default function BubbleCatchGame({ kid, onComplete }: Props) {
         </div>
       </div>
 
-      {/* Game Area — fills remaining height */}
-      <div className="relative flex-1 min-h-0 bg-gradient-to-b from-cyan-100 to-blue-200 rounded-[24px] sm:rounded-[40px] shadow-2xl border-4 sm:border-8 border-white overflow-hidden">
+      {/* Game Area — touch-none prevents swipe/scroll issues on mobile */}
+      <div className="relative flex-1 min-h-0 touch-none bg-gradient-to-b from-cyan-100 to-blue-200 rounded-[24px] sm:rounded-[40px] shadow-2xl border-4 sm:border-8 border-white overflow-hidden">
         {/* Bubbles */}
         <AnimatePresence>
           {bubbles.map(b => (
@@ -144,7 +143,7 @@ export default function BubbleCatchGame({ kid, onComplete }: Props) {
               animate={{ scale: 1 }}
               exit={{ scale: 0, opacity: 0 }}
               onClick={() => handleBubbleClick(b)}
-              className="absolute bg-white/40 backdrop-blur-sm rounded-full border-2 border-white/60 flex items-center justify-center font-black text-[#2F3061] shadow-lg hover:scale-110 transition-transform z-20"
+              className="absolute bg-white/40 backdrop-blur-sm rounded-full border-2 border-white/60 flex items-center justify-center font-black text-[#2F3061] shadow-lg hover:scale-110 active:scale-95 transition-transform z-20 select-none touch-manipulation"
               style={{
                 left: `${b.x}%`,
                 top: `${b.y}%`,
@@ -176,7 +175,7 @@ export default function BubbleCatchGame({ kid, onComplete }: Props) {
               <p className="text-gray-500 font-medium text-sm sm:text-base">Catch the bubbles with the right letters before they reach the top!</p>
               <button
                 onClick={resetGame}
-                className="w-full bg-cyan-500 text-white py-3 sm:py-4 rounded-2xl font-black text-lg sm:text-xl shadow-lg hover:scale-105 transition-transform"
+                className="w-full bg-cyan-500 text-white py-3 sm:py-4 rounded-2xl font-black text-lg sm:text-xl shadow-lg hover:scale-105 active:scale-95 transition-transform"
               >
                 Start Popping!
               </button>
@@ -193,7 +192,7 @@ export default function BubbleCatchGame({ kid, onComplete }: Props) {
               <p className="text-gray-500 font-medium text-sm sm:text-base">A bubble reached the top! Want to try again?</p>
               <button
                 onClick={resetGame}
-                className="w-full bg-red-500 text-white py-3 sm:py-4 rounded-2xl font-black text-lg sm:text-xl shadow-lg hover:scale-105 transition-transform"
+                className="w-full bg-red-500 text-white py-3 sm:py-4 rounded-2xl font-black text-lg sm:text-xl shadow-lg hover:scale-105 active:scale-95 transition-transform"
               >
                 Try Again
               </button>
