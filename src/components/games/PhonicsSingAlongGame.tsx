@@ -37,16 +37,13 @@ export default function PhonicsSingAlongGame({ kid, onComplete }: Props) {
   const [showIntro, setShowIntro] = useState(true);
   const [isAnimating, setIsAnimating] = useState(false);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
-
   const current = PHONICS[currentIndex];
 
   const speak = (text: string, rate = 0.7) => {
     if (!window.speechSynthesis) return;
     window.speechSynthesis.cancel();
     const utt = new SpeechSynthesisUtterance(text);
-    utt.rate = rate;
-    utt.pitch = 1.4;
-    utt.volume = 1;
+    utt.rate = rate; utt.pitch = 1.4; utt.volume = 1;
     utteranceRef.current = utt;
     window.speechSynthesis.speak(utt);
   };
@@ -55,19 +52,14 @@ export default function PhonicsSingAlongGame({ kid, onComplete }: Props) {
     if (isAnimating) return;
     setIsAnimating(true);
     setTapped(true);
-
-    const phrase = `${current.letter} says ${current.sound}, ${current.sound}, ${current.word}!`;
-    speak(phrase, 0.65);
+    speak(`${current.letter} says ${current.sound}, ${current.sound}, ${current.word}!`, 0.65);
     soundManager.playPop();
-
     setTimeout(() => {
       setIsAnimating(false);
       if (!completed.includes(currentIndex)) {
         const newCompleted = [...completed, currentIndex];
         setCompleted(newCompleted);
-        if (newCompleted.length >= 5) {
-          handleFinish();
-        }
+        if (newCompleted.length >= 5) { handleFinish(); }
       }
     }, 2000);
   };
@@ -79,8 +71,7 @@ export default function PhonicsSingAlongGame({ kid, onComplete }: Props) {
   };
 
   const nextLetter = () => {
-    setTapped(false);
-    setIsAnimating(false);
+    setTapped(false); setIsAnimating(false);
     const next = (currentIndex + 1) % PHONICS.length;
     setCurrentIndex(next);
     const item = PHONICS[next];
@@ -88,10 +79,7 @@ export default function PhonicsSingAlongGame({ kid, onComplete }: Props) {
   };
 
   const reset = () => {
-    setCurrentIndex(0);
-    setTapped(false);
-    setCompleted([]);
-    setShowIntro(true);
+    setCurrentIndex(0); setTapped(false); setCompleted([]); setShowIntro(true);
     window.speechSynthesis?.cancel();
   };
 
@@ -100,36 +88,30 @@ export default function PhonicsSingAlongGame({ kid, onComplete }: Props) {
     speak(`Let's learn our letters! ${current.letter}! ${current.word}`, 0.7);
   };
 
-  useEffect(() => {
-    return () => { window.speechSynthesis?.cancel(); };
-  }, []);
+  useEffect(() => { return () => { window.speechSynthesis?.cancel(); }; }, []);
 
   const progress = Math.min(completed.length, 5);
 
   if (showIntro) {
     return (
-      <div className="space-y-8 text-center">
+      <div className="space-y-4 sm:space-y-8 text-center">
         <div className="flex items-center justify-between">
-          <Link to="/" className="p-3 bg-white rounded-2xl shadow-md hover:bg-gray-50">
-            <ArrowLeft className="w-6 h-6" />
+          <Link to="/" className="p-2 sm:p-3 bg-white rounded-2xl shadow-md hover:bg-gray-50">
+            <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6" />
           </Link>
-          <h2 className="text-3xl font-black text-purple-500">Phonics Sing-Along</h2>
-          <div className="w-12" />
+          <h2 className="text-xl sm:text-3xl font-black text-purple-500">Phonics Sing-Along</h2>
+          <div className="w-10 sm:w-12" />
         </div>
         <motion.div
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="bg-white p-12 rounded-[40px] shadow-2xl border-8 border-purple-300 space-y-8 max-w-md mx-auto"
+          initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+          className="bg-white p-8 sm:p-12 rounded-[28px] sm:rounded-[40px] shadow-2xl border-4 sm:border-8 border-purple-300 space-y-6 sm:space-y-8 max-w-md mx-auto"
         >
-          <div className="text-8xl animate-bounce">🎵</div>
-          <h3 className="text-3xl font-black text-[#2F3061]">Learn Your Letters!</h3>
-          <p className="text-xl text-gray-500 font-medium">
+          <div className="text-7xl sm:text-8xl animate-bounce">🎵</div>
+          <h3 className="text-2xl sm:text-3xl font-black text-[#2F3061]">Learn Your Letters!</h3>
+          <p className="text-lg sm:text-xl text-gray-500 font-medium">
             Tap each big letter to hear its sound and name. Learn 5 letters to win! 🌟
           </p>
-          <button
-            onClick={startGame}
-            className="w-full bg-purple-500 text-white py-5 rounded-3xl font-black text-2xl shadow-xl hover:scale-105 transition-transform"
-          >
+          <button onClick={startGame} className="w-full bg-purple-500 text-white py-4 sm:py-5 rounded-3xl font-black text-xl sm:text-2xl shadow-xl hover:scale-105 transition-transform">
             Let's Sing! 🎶
           </button>
         </motion.div>
@@ -138,27 +120,23 @@ export default function PhonicsSingAlongGame({ kid, onComplete }: Props) {
   }
 
   return (
-    <div className="space-y-6 text-center">
+    <div className="space-y-4 sm:space-y-6 text-center">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <Link to="/" className="p-3 bg-white rounded-2xl shadow-md hover:bg-gray-50">
-          <ArrowLeft className="w-6 h-6" />
+        <Link to="/" className="p-2 sm:p-3 bg-white rounded-2xl shadow-md hover:bg-gray-50">
+          <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6" />
         </Link>
-        <h2 className="text-3xl font-black text-purple-500">Phonics Sing-Along</h2>
-        <div className="flex items-center gap-1 bg-white px-3 py-2 rounded-2xl shadow-sm">
-          <Star className="fill-yellow-400 text-yellow-400 w-5 h-5" />
-          <span className="text-purple-600 font-black">{progress}/5</span>
+        <h2 className="text-xl sm:text-3xl font-black text-purple-500">Phonics Sing-Along</h2>
+        <div className="flex items-center gap-1 bg-white px-2 sm:px-3 py-1 sm:py-2 rounded-2xl shadow-sm">
+          <Star className="fill-yellow-400 text-yellow-400 w-4 h-4 sm:w-5 sm:h-5" />
+          <span className="text-purple-600 font-black text-sm sm:text-base">{progress}/5</span>
         </div>
       </div>
 
       {/* Progress dots */}
-      <div className="flex justify-center gap-3">
+      <div className="flex justify-center gap-2 sm:gap-3">
         {Array.from({ length: 5 }).map((_, i) => (
-          <div
-            key={i}
-            className={`w-4 h-4 rounded-full transition-all ${
-              i < progress ? 'bg-purple-500 scale-125' : 'bg-gray-200'
-            }`}
-          />
+          <div key={i} className={`w-3 h-3 sm:w-4 sm:h-4 rounded-full transition-all ${i < progress ? 'bg-purple-500 scale-125' : 'bg-gray-200'}`} />
         ))}
       </div>
 
@@ -166,59 +144,47 @@ export default function PhonicsSingAlongGame({ kid, onComplete }: Props) {
       <motion.button
         whileTap={{ scale: 0.95 }}
         onClick={playPhonic}
-        className={`relative w-full ${current.color} rounded-[40px] shadow-2xl border-8 border-white p-10 space-y-4 cursor-pointer overflow-hidden`}
+        className={`relative w-full ${current.color} rounded-[28px] sm:rounded-[40px] shadow-2xl border-4 sm:border-8 border-white p-6 sm:p-10 space-y-3 sm:space-y-4 cursor-pointer overflow-hidden`}
       >
-        {/* Background letter watermark */}
         <div className="absolute inset-0 flex items-center justify-center opacity-10 text-white font-black select-none pointer-events-none"
-          style={{ fontSize: '20rem', lineHeight: 1 }}>
+          style={{ fontSize: 'clamp(8rem, 40vw, 20rem)', lineHeight: 1 }}>
           {current.letter}
         </div>
-
         <motion.div
           animate={isAnimating ? { scale: [1, 1.3, 1], rotate: [0, -5, 5, 0] } : {}}
           transition={{ duration: 0.5 }}
-          className="text-9xl relative z-10"
+          className="text-7xl sm:text-9xl relative z-10"
         >
           {current.emoji}
         </motion.div>
-
-        <div className="relative z-10 space-y-2">
-          <p className="text-white/80 font-black text-2xl uppercase tracking-wider">
-            {current.letter} says...
-          </p>
+        <div className="relative z-10 space-y-1 sm:space-y-2">
+          <p className="text-white/80 font-black text-xl sm:text-2xl uppercase tracking-wider">{current.letter} says...</p>
           <motion.p
             animate={isAnimating ? { scale: [1, 1.2, 1] } : {}}
-            className="text-white font-black text-6xl"
+            className="text-white font-black text-5xl sm:text-6xl"
           >
             "{current.sound}"
           </motion.p>
-          <p className="text-white font-black text-3xl">{current.word}!</p>
+          <p className="text-white font-black text-2xl sm:text-3xl">{current.word}!</p>
         </div>
-
-        <div className="relative z-10 flex items-center justify-center gap-3 bg-white/20 px-6 py-3 rounded-2xl">
-          <Volume2 className="text-white w-6 h-6" />
-          <span className="text-white font-black text-lg">Tap to hear!</span>
+        <div className="relative z-10 flex items-center justify-center gap-2 sm:gap-3 bg-white/20 px-4 sm:px-6 py-2 sm:py-3 rounded-2xl">
+          <Volume2 className="text-white w-5 h-5 sm:w-6 sm:h-6" />
+          <span className="text-white font-black text-base sm:text-lg">Tap to hear!</span>
         </div>
       </motion.button>
 
       {/* Controls */}
-      <div className="flex justify-center gap-4">
-        <button
-          onClick={reset}
-          className="flex items-center gap-2 px-5 py-3 bg-gray-100 rounded-2xl font-bold text-gray-600 hover:bg-gray-200"
-        >
-          <RotateCcw className="w-5 h-5" />
+      <div className="flex justify-center gap-3 sm:gap-4">
+        <button onClick={reset} className="flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-3 bg-gray-100 rounded-2xl font-bold text-gray-600 hover:bg-gray-200 text-sm sm:text-base">
+          <RotateCcw className="w-4 h-4 sm:w-5 sm:h-5" />
           Restart
         </button>
-        <button
-          onClick={nextLetter}
-          className="px-8 py-3 bg-purple-500 text-white rounded-2xl font-black text-lg shadow-lg hover:scale-105 transition-transform"
-        >
+        <button onClick={nextLetter} className="px-5 sm:px-8 py-2 sm:py-3 bg-purple-500 text-white rounded-2xl font-black text-base sm:text-lg shadow-lg hover:scale-105 transition-transform">
           Next Letter →
         </button>
       </div>
 
-      <p className="text-gray-400 font-medium">
+      <p className="text-gray-400 font-medium text-xs sm:text-sm">
         Tap the card to hear <strong>{current.letter}</strong> for <strong>{current.word}</strong>!
       </p>
     </div>
