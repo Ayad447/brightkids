@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence, useMotionValue } from 'motion/react';
-import { ArrowLeft, RotateCcw, Cloud } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import confetti from 'canvas-confetti';
 import { KidProfile } from '../../types';
 import { soundManager } from '../../lib/sound-utils';
 
@@ -11,77 +10,101 @@ interface Props {
   onComplete: (stars: number) => void;
 }
 
-interface Obstacle {
+interface WallObstacle {
   id: number;
-  x: number;
-  y: number;
-  size: number;
+  y: number; // Moving along Y-axis
+  blockedLanes: number[]; // 0: Left, 1: Center, 2: Right
   speed: number;
-  emoji: string;
 }
 
-const OBSTACLE_EMOJIS = ['⛈️', '🦅', '🎈', '🛸', '☄️'];
+// X-axis percentages for the center of the 3 vertical lanes
+const LANES = [16.66, 50, 83.33];
 
 export default function SkyRescueGame({ kid, onComplete }: Props) {
-  const planeX = useMotionValue(20);
-  const planeY = useMotionValue(50);
-  const [obstacles, setObstacles] = useState<Obstacle[]>([]);
+  const [currentLane, setCurrentLane] = useState(1); // Start in the center lane
+  const [obstacles, setObstacles] = useState<WallObstacle[]>([]);
   const [score, setScore] = useState(0);
   const [isGameOver, setIsGameOver] = useState(false);
   const [isStarted, setIsStarted] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+
   const requestRef = useRef<number>(null);
+  const currentLaneRef = useRef(currentLane);
+  const scoreRef = useRef(score);
+
+  // Keep refs synced with state for the animation loop
+  useEffect(() => { currentLaneRef.current = currentLane; }, [currentLane]);
+  useEffect(() => { scoreRef.current = score; }, [score]);
 
   const spawnObstacle = () => {
-    const difficultyMultiplier = 1 + Math.floor(score / 500) * 0.2;
-    const newObstacle: Obstacle = {
+    // Pick 1 or 2 lanes to block (leaving at least 1 open)
+    const allLanes = [0, 1, 2];
+    const numBlocked = Math.random() > 0.6 ? 2 : 1;
+    const shuffled = allLanes.sort(() => 0.5 - Math.random());
+    const blockedLanes = shuffled.slice(0, numBlocked);
+
+    // Calculate display score (10 internal score ticks = 1 display point)
+    const displayScore = Math.floor(scoreRef.current / 10);
+
+    // Difficulty increases every 150 points
+    const difficultyMultiplier = 1 + Math.floor(displayScore / 150) * 0.25;
+
+    const newObstacle: WallObstacle = {
       id: Date.now(),
-      x: 110,
-      y: Math.random() * 80 + 10,
-      size: Math.random() * 15 + 28,
-      speed: (Math.random() * 0.5 + 0.3) * difficultyMultiplier,
-      emoji: OBSTACLE_EMOJIS[Math.floor(Math.random() * OBSTACLE_EMOJIS.length)],
+      y: -15, // Start off-screen at the top
+      blockedLanes,
+      speed: (Math.random() * 0.4 + 0.5) * difficultyMultiplier,
     };
+
     setObstacles(prev => [...prev, newObstacle]);
   };
 
   const updateGame = () => {
     if (isGameOver || !isStarted) return;
+
     setObstacles(prev => {
-      const next = prev.map(o => ({ ...o, x: o.x - o.speed })).filter(o => o.x > -20);
-      const currentX = planeX.get();
-      const currentY = planeY.get();
+      // Obstacles move DOWN the screen (Y increases)
+      const next = prev.map(o => ({ ...o, y: o.y + o.speed })).filter(o => o.y < 120);
+
+      // The plane is fixed at Y = 80%. Check if an obstacle overlaps this zone.
       const collision = next.find(o => {
-        const dx = Math.abs(o.x - currentX);
-        const dy = Math.abs(o.y - currentY);
-        return dx < 8 && dy < 8;
+        const inCollisionZone = o.y > 72 && o.y < 88;
+        const inBlockedLane = o.blockedLanes.includes(currentLaneRef.current);
+        return inCollisionZone && inBlockedLane;
       });
+
       if (collision) {
-        setIsGameOver(true);
-        soundManager.playGameOver();
-        soundManager.stopMusic();
+        handleGameOver();
         return next;
       }
       return next;
     });
+
+    // Infinitely increment the score
     setScore(s => s + 1);
-    if (score > 0 && score % 1000 === 0) { handleWin(); }
+
     requestRef.current = requestAnimationFrame(updateGame);
   };
 
-  const handleWin = () => {
-    setIsStarted(false);
-    soundManager.playSuccess();
+  const handleGameOver = () => {
+    setIsGameOver(true);
+    soundManager.playGameOver();
     soundManager.stopMusic();
-    confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
-    onComplete(10);
+
+    // Optional: Reward stars based on survival time before they restart or leave
+    const finalDisplayScore = Math.floor(scoreRef.current / 10);
+    if (finalDisplayScore >= 50) {
+      onComplete(10);
+    }
   };
 
   useEffect(() => {
     if (isStarted && !isGameOver) {
       soundManager.startMusic();
       requestRef.current = requestAnimationFrame(updateGame);
-      const interval = setInterval(spawnObstacle, 1500);
+
+      // The speed of the loop is constant, but the falling speed increases
+      const interval = setInterval(spawnObstacle, 1800);
+
       return () => {
         if (requestRef.current) cancelAnimationFrame(requestRef.current);
         clearInterval(interval);
@@ -90,27 +113,9 @@ export default function SkyRescueGame({ kid, onComplete }: Props) {
     }
   }, [isStarted, isGameOver]);
 
-  const handleMove = (e: React.MouseEvent | React.TouchEvent) => {
-    if (!isStarted || isGameOver || !containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    let clientX, clientY;
-    if ('touches' in e) {
-      clientX = e.touches[0].clientX;
-      clientY = e.touches[0].clientY;
-    } else {
-      clientX = e.clientX;
-      clientY = e.clientY;
-    }
-    const x = ((clientX - rect.left) / rect.width) * 100;
-    const y = ((clientY - rect.top) / rect.height) * 100;
-    planeX.set(Math.max(5, Math.min(95, x)));
-    planeY.set(Math.max(5, Math.min(95, y)));
-  };
-
   const resetGame = () => {
     soundManager.playStartGame();
-    planeX.set(20);
-    planeY.set(50);
+    setCurrentLane(1);
     setObstacles([]);
     setScore(0);
     setIsGameOver(false);
@@ -118,7 +123,7 @@ export default function SkyRescueGame({ kid, onComplete }: Props) {
   };
 
   return (
-    <div className="flex flex-col h-full space-y-3 sm:space-y-4 text-center">
+    <div className="flex flex-col h-[100dvh] max-h-screen p-4 space-y-3 sm:space-y-4 text-center overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between flex-shrink-0">
         <Link to="/" className="p-2 sm:p-3 bg-white rounded-2xl shadow-md hover:bg-gray-50">
@@ -131,58 +136,72 @@ export default function SkyRescueGame({ kid, onComplete }: Props) {
         </div>
       </div>
 
-      {/* Game Area */}
-      <div
-        ref={containerRef}
-        onMouseMove={handleMove}
-        onTouchMove={handleMove}
-        className="relative flex-1 min-h-0 bg-gradient-to-b from-blue-400 to-blue-300 rounded-[24px] sm:rounded-[40px] shadow-2xl border-4 sm:border-8 border-white overflow-hidden cursor-none touch-none"
-      >
-        {/* Decorative Clouds */}
-        <div className="absolute inset-0 opacity-30 pointer-events-none">
-          <Cloud className="absolute top-6 left-6 w-12 h-12 sm:w-20 sm:h-20 text-white animate-pulse" />
-          <Cloud className="absolute top-24 right-8 w-16 h-16 sm:w-32 sm:h-32 text-white animate-bounce" />
-          <Cloud className="absolute bottom-12 left-1/4 w-14 h-14 sm:w-24 sm:h-24 text-white" />
-        </div>
+      {/* Main Game Layout */}
+      <div className="relative flex-1 bg-gradient-to-b from-blue-400 to-blue-300 rounded-[24px] sm:rounded-[40px] shadow-2xl border-4 sm:border-8 border-white overflow-hidden select-none touch-none">
+
+        {/* Vertical Lane Dividers */}
+        <div className="absolute left-[33.33%] h-full border-l-2 border-white/20 border-dashed z-0" />
+        <div className="absolute left-[66.66%] h-full border-l-2 border-white/20 border-dashed z-0" />
 
         {/* Plane */}
         <motion.div
-          style={{ x: planeX, y: planeY, left: 0, top: 0, position: 'absolute' }}
-          className="text-4xl sm:text-6xl drop-shadow-lg z-20 pointer-events-none"
-          // Center the emoji on the motion value position
-          sx={{ transform: 'translate(-50%, -50%)' }}
+          animate={{ left: `${LANES[currentLane]}%` }}
+          transition={{ type: "spring", stiffness: 300, damping: 25 }}
+          className="absolute top-[80%] text-4xl sm:text-6xl z-20"
+          style={{ transform: 'translate(-50%, -50%)' }}
         >
-          🛩️
+          <div className="-rotate-45 drop-shadow-xl">✈️</div>
         </motion.div>
 
-        {/* Obstacles */}
+        {/* Storm Cloud Walls coming down */}
         <AnimatePresence>
           {obstacles.map(o => (
-            <div
-              key={o.id}
-              className="absolute transition-all duration-75"
-              style={{
-                left: `${o.x}%`,
-                top: `${o.y}%`,
-                fontSize: `${o.size}px`,
-                transform: 'translate(-50%, -50%)',
-              }}
-            >
-              {o.emoji}
-            </div>
+            <React.Fragment key={o.id}>
+              {o.blockedLanes.map(lane => (
+                <div
+                  key={`${o.id}-${lane}`}
+                  className="absolute bg-gray-700/80 backdrop-blur-sm rounded-xl border-2 border-gray-600 flex items-center justify-center shadow-lg"
+                  style={{
+                    top: `${o.y}%`,
+                    left: `${LANES[lane]}%`,
+                    width: '30%',
+                    height: '60px',
+                    transform: 'translate(-50%, -50%)',
+                  }}
+                >
+                  <span className="text-2xl sm:text-3xl">⛈️</span>
+                </div>
+              ))}
+            </React.Fragment>
           ))}
         </AnimatePresence>
 
+        {/* Tap/Touch Lanes Overlay */}
+        {isStarted && !isGameOver && (
+          <div className="absolute inset-0 flex z-30">
+            {[0, 1, 2].map((laneIndex) => (
+              <div
+                key={laneIndex}
+                className="flex-1 cursor-pointer"
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  setCurrentLane(laneIndex);
+                }}
+              />
+            ))}
+          </div>
+        )}
+
         {/* Start Overlay */}
         {!isStarted && !isGameOver && (
-          <div className="absolute inset-0 bg-blue-500/20 backdrop-blur-sm flex items-center justify-center z-30 p-4">
-            <div className="bg-white p-6 sm:p-8 rounded-[28px] sm:rounded-[40px] shadow-2xl space-y-4 sm:space-y-6 max-w-[280px] sm:max-w-xs w-full border-4 sm:border-8 border-blue-100">
-              <div className="text-5xl sm:text-7xl">👨‍✈️</div>
-              <h3 className="text-xl sm:text-2xl font-black text-[#2F3061]">Ready for Takeoff?</h3>
-              <p className="text-gray-500 font-medium text-sm sm:text-base">Use your finger to move the plane and avoid obstacles!</p>
+          <div className="absolute inset-0 bg-blue-500/20 backdrop-blur-sm flex items-center justify-center z-40 p-4">
+            <div className="bg-white p-4 sm:p-8 rounded-[28px] sm:rounded-[40px] shadow-2xl space-y-4 max-w-[280px] w-full border-4 border-blue-100">
+              <div className="text-5xl">👨‍✈️</div>
+              <h3 className="text-xl font-black text-[#2F3061]">Ready for Takeoff?</h3>
+              <p className="text-gray-500 text-sm">Tap the screen lanes to steer left or right and dodge the storm clouds!</p>
               <button
                 onClick={resetGame}
-                className="w-full bg-blue-500 text-white py-3 sm:py-4 rounded-2xl font-black text-lg sm:text-xl shadow-lg hover:scale-105 transition-transform"
+                className="w-full bg-blue-500 text-white py-3 rounded-2xl font-black shadow-lg hover:scale-105 active:scale-95 transition-transform"
               >
                 Start Flying!
               </button>
@@ -192,14 +211,16 @@ export default function SkyRescueGame({ kid, onComplete }: Props) {
 
         {/* Game Over Overlay */}
         {isGameOver && (
-          <div className="absolute inset-0 bg-red-500/20 backdrop-blur-sm flex items-center justify-center z-30 p-4">
-            <div className="bg-white p-6 sm:p-8 rounded-[28px] sm:rounded-[40px] shadow-2xl space-y-4 sm:space-y-6 max-w-[280px] sm:max-w-xs w-full border-4 sm:border-8 border-red-100">
-              <div className="text-5xl sm:text-7xl">💥</div>
-              <h3 className="text-xl sm:text-2xl font-black text-[#2F3061]">Oh No!</h3>
-              <p className="text-gray-500 font-medium text-sm sm:text-base">You hit something! Want to try again?</p>
+          <div className="absolute inset-0 bg-red-500/20 backdrop-blur-sm flex items-center justify-center z-40 p-4">
+            <div className="bg-white p-4 sm:p-8 rounded-[28px] sm:rounded-[40px] shadow-2xl space-y-4 max-w-[280px] w-full border-4 border-red-100">
+              <div className="text-5xl">💥</div>
+              <h3 className="text-xl font-black text-[#2F3061]">Oh No!</h3>
+              <p className="text-gray-500 text-sm">
+                You hit a storm! Final Score: <span className="font-bold text-blue-500">{Math.floor(score / 10)}</span>
+              </p>
               <button
                 onClick={resetGame}
-                className="w-full bg-red-500 text-white py-3 sm:py-4 rounded-2xl font-black text-lg sm:text-xl shadow-lg hover:scale-105 transition-transform"
+                className="w-full bg-red-500 text-white py-3 rounded-2xl font-black shadow-lg hover:scale-105 active:scale-95 transition-transform"
               >
                 Try Again
               </button>
@@ -207,10 +228,6 @@ export default function SkyRescueGame({ kid, onComplete }: Props) {
           </div>
         )}
       </div>
-
-      <p className="text-gray-400 font-medium text-xs sm:text-sm flex-shrink-0">
-        Help {kid.name} navigate the sky safely!
-      </p>
     </div>
   );
 }
